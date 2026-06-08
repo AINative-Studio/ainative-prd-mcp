@@ -1,0 +1,198 @@
+{
+  "platform": "AINative Studio",
+  "version": "2026.06",
+  "base_url": "https://api.ainative.studio",
+  "docs_url": "https://docs.ainative.studio",
+  "products": [
+    {
+      "name": "ZeroDB",
+      "category": "Data Platform",
+      "description": "Unified data platform for AI agents — vector storage, NoSQL tables, file storage (S3-compatible), event streaming, agent memory, and dedicated PostgreSQL instances.",
+      "features": ["Vector search", "NoSQL tables", "File storage", "Event streaming", "Agent memory", "PostgreSQL", "RLHF feedback", "Batch operations"],
+      "api_prefix": "/api/v1/zerodb",
+      "mcp_server": "ainative-zerodb-mcp-server",
+      "sdk_packages": ["zerodb-mcp", "zerodb-cli", "zerodb-local", "langchain-zerodb", "llama-index-vector-stores-zerodb"],
+      "pricing_tiers": ["Free (1 project, 10K vectors)", "Individual $10/mo", "Pro $29/mo", "Enterprise custom"]
+    },
+    {
+      "name": "ZeroMemory",
+      "category": "Cognitive Memory",
+      "description": "Multi-tier cognitive memory system for AI agents — working memory, episodic memory, semantic memory with automatic consolidation, decay scoring, reflection, entity profiles, and Context Graph (GraphRAG).",
+      "features": ["Remember/Recall/Forget", "Reflection", "Entity profiles", "Context Graph", "GraphRAG", "Ontology management", "Edge versioning", "Memory decay", "Session memory", "Skill candidates", "Decision traces"],
+      "api_prefix": "/api/v1/public/memory/v2",
+      "mcp_server": "ainative-zerodb-memory-mcp",
+      "endpoints": {
+        "core": ["remember", "recall", "forget", "reflect", "profile", "relate"],
+        "graph": ["entity", "edge", "traverse", "neighbors", "stats", "entities", "entity/merge", "graphrag", "ontology", "ontology/infer", "ontology/apply", "contradictions", "templates"],
+        "plan": ["plan/create", "plan/get", "plan/update", "plan/history"]
+      }
+    },
+    {
+      "name": "Agent Cloud",
+      "category": "Agent Infrastructure",
+      "description": "Managed infrastructure for deploying and running AI agents at scale — agent registry, A2A networking, OAuth 2.1, billing, credential vault, dedicated deployments, inference routing, observability.",
+      "features": ["Agent registry", "A2A networking", "Agent keys", "OAuth 2.1", "Agent billing", "Bridge environments", "Credential vault", "Dedicated deployments", "Egress proxy", "Inference routing", "Observability", "Peer swarm"],
+      "api_prefix": "/api/v1/agents",
+      "endpoints_categories": ["agent_auth", "agent_approvals", "agent_billing", "agent_cloud_registry", "agent_keys", "agent_resources", "agent_sessions", "agent_state", "agent_trust"]
+    },
+    {
+      "name": "AI Kit",
+      "category": "UI Framework",
+      "description": "14-package framework-agnostic UI toolkit for building AI-powered interfaces — components, hooks, React integration, A2UI (agent-to-UI), observability, and safety modules.",
+      "features": ["Core library", "Components", "Hooks", "React integration", "A2UI", "Observability", "Safety modules"],
+      "packages": ["@ainative/ai-kit-core", "@ainative/ai-kit-react"]
+    },
+    {
+      "name": "Cody CLI",
+      "category": "Developer Tools",
+      "description": "AI-powered coding assistant CLI with ZeroDB memory, MCP integration, hooks, sandboxing, and web sessions.",
+      "features": ["AI chat", "Code generation", "MCP integration", "Memory", "Hooks", "Sandboxing", "Chrome extension", "Web sessions"],
+      "npm_package": "@ainative/cody-cli"
+    },
+    {
+      "name": "Chat Completions API",
+      "category": "AI Inference",
+      "description": "OpenAI-compatible chat completions API with tiered provider routing, tool calling support, and auto-fallback on errors.",
+      "features": ["OpenAI-compatible", "Tool calling", "Streaming", "Tiered routing", "Auto-fallback"],
+      "api_prefix": "/api/v1/chat/completions",
+      "routing_tiers": {
+        "free": "Cerebras -> Meta -> NIM",
+        "paid": "DO -> NIM -> Meta"
+      },
+      "models": ["meta-llama/Llama-3.3-70B-Instruct", "qwen3-coder-flash", "kimi-k2", "deepseek-4-flash"]
+    },
+    {
+      "name": "Live Streaming",
+      "category": "Media",
+      "description": "Live streaming platform with WebSocket chat, categories, analytics, VOD recording via Cloudflare Stream.",
+      "features": ["Stream creation", "WebSocket chat", "Categories", "Analytics", "VOD recording", "Viewer metrics", "Captions"],
+      "api_prefix": "/api/v1/streaming"
+    },
+    {
+      "name": "Multimodal Generation",
+      "category": "AI Generation",
+      "description": "Image generation (fal.ai), video creation (Runway), and speech synthesis (ElevenLabs) via unified /media namespace.",
+      "features": ["Image generation", "Video creation", "Speech synthesis", "Transcription"],
+      "api_prefix": "/api/v1/media",
+      "providers": ["fal.ai", "ElevenLabs", "Runway"]
+    },
+    {
+      "name": "Embeddings API",
+      "category": "AI Inference",
+      "description": "Free embedding generation using BAAI BGE models via DigitalOcean inference.",
+      "features": ["Text embeddings", "Multiple model sizes"],
+      "api_prefix": "/api/v1/embeddings",
+      "models": ["BAAI/bge-small-en-v1.5", "BAAI/bge-base-en-v1.5", "BAAI/bge-large-en-v1.5"]
+    },
+    {
+      "name": "Echo Developer Program",
+      "category": "Business",
+      "description": "Revenue sharing platform for developers building apps with AINative APIs — set markup (0-40%), earn from customer usage, payouts via Stripe Connect.",
+      "features": ["Developer registration", "Markup pricing", "Earnings dashboard", "Stripe Connect payouts", "Tax forms", "Analytics"],
+      "api_prefix": "/api/v1/developer",
+      "platform_fee": "5%",
+      "sdk_packages": ["@ainative/react-sdk", "@ainative/next-sdk", "@ainative/vue-sdk", "@ainative/svelte-sdk"]
+    },
+    {
+      "name": "OpenCap Stack",
+      "category": "FinTech",
+      "description": "Open-source cap table management — stakeholders, share classes, SAFEs, equity plans, valuations, documents, dilution analysis, waterfall modeling.",
+      "features": ["Cap table", "SAFEs", "Equity plans", "Valuations", "Dilution analysis", "Waterfall modeling", "Mercury banking"],
+      "mcp_server": "opencap-mcp"
+    },
+    {
+      "name": "ZeroInvoice",
+      "category": "Business",
+      "description": "Invoice management with Stripe and QuickBooks integration.",
+      "api_prefix": "/api/v1/invoices"
+    },
+    {
+      "name": "ZeroCommerce",
+      "category": "Business",
+      "description": "E-commerce API with product templating and Stripe checkout.",
+      "api_prefix": "/api/v1/commerce"
+    },
+    {
+      "name": "ZeroPipeline",
+      "category": "Business",
+      "description": "CRM and deal pipeline management.",
+      "mcp_server": "zeropipeline-mcp"
+    },
+    {
+      "name": "Browser Agent",
+      "category": "Automation",
+      "description": "Automated browser workflows — extraction, validation, memory enrichment, batch processing.",
+      "features": ["Browser automation", "Data extraction", "Validation", "Memory enrichment", "Batch extraction"],
+      "mcp_server": "@ainative/browser-mcp"
+    },
+    {
+      "name": "Content Workflow",
+      "category": "Content",
+      "description": "AI personas, content scheduling, and social media publishing.",
+      "api_prefix": "/api/v1/content"
+    },
+    {
+      "name": "AX Audit",
+      "category": "Quality",
+      "description": "Agent Accessibility (AX) scoring — measures how well a website supports AI agents operating autonomously.",
+      "api_prefix": "/api/v1/ax"
+    },
+    {
+      "name": "Community Platform",
+      "category": "Social",
+      "description": "Community events, social connections, posts, comments, groups, trending content.",
+      "features": ["Events", "Social graph", "Posts", "Comments", "Groups", "Trending", "Search"],
+      "api_prefix": "/api/v1/community"
+    },
+    {
+      "name": "MCP Hosting",
+      "category": "Infrastructure",
+      "description": "Hosted MCP server infrastructure — multi-tenant Kubernetes, Redis sessions, monitoring, billing integration.",
+      "features": ["Multi-tenant isolation", "Auto-provisioning", "Billing integration", "Monitoring"],
+      "endpoints": {
+        "settings": "/v1/mcp/servers",
+        "proxy": "/v1/mcp/proxy"
+      }
+    },
+    {
+      "name": "Sequential Thinking",
+      "category": "AI Reasoning",
+      "description": "Structured reasoning chains stored as persistent plan artifacts in ZeroDB.",
+      "mcp_server": "zerodb-sequential-thinking-mcp",
+      "tools": ["sequential_think", "sequential_conclude", "sequential_resume"]
+    },
+    {
+      "name": "Agent402",
+      "category": "Web3",
+      "description": "Stablecoin payments for AI agent-to-agent commerce.",
+      "api_prefix": "/api/v1/agent402"
+    },
+    {
+      "name": "QNN API",
+      "category": "Moonshots",
+      "description": "Quantum Neural Network API — experimental quantum computing interface.",
+      "api_prefix": "/api/v1/qnn"
+    }
+  ],
+  "architecture": {
+    "backend": "FastAPI + SQLAlchemy",
+    "database": "DigitalOcean Managed PostgreSQL (port 25060, SSL required)",
+    "gateway": "APISIX (api.ainative.studio)",
+    "deployment": "Railway",
+    "memory": "ZeroDB (mandatory for all agent memory)",
+    "inference": "Tiered routing: Cerebras -> Meta -> NIM (free), DO -> NIM -> Meta (paid)",
+    "constraints": [
+      "API handlers: validate input, call service layer, return response. No business logic.",
+      "Service layer: all business logic. No direct DB writes outside service layer.",
+      "Repository/DB: all access via SQLAlchemy session. No raw SQL in endpoints.",
+      "Memory/Context: ZeroDB mandatory. No generic memory MCPs, no Supabase.",
+      "Secrets: never in code. Railway env vars or .env only.",
+      "Test coverage: 80% minimum. TDD required."
+    ]
+  },
+  "sdks": {
+    "npm": ["@ainative/sdk", "@ainative/react-sdk", "@ainative/next-sdk", "@ainative/vue-sdk", "@ainative/svelte-sdk", "@ainative/agent-sdk", "@ainative/agent-runtime", "@ainative/cody-cli", "@ainative/browser-mcp", "@ainative/ai-kit-core", "@ainative/ai-kit-react"],
+    "pypi": ["zerodb-mcp", "zerodb-cli", "zerodb-local", "langchain-zerodb", "llama-index-vector-stores-zerodb", "ainative-agent-sdk"],
+    "mcp_servers": ["ainative-zerodb-mcp-server", "ainative-zerodb-memory-mcp", "ainative-prd-mcp", "ainative-strapi-mcp-server", "@ainative/gtm-mcp", "@ainative/browser-mcp", "zerodb-sequential-thinking-mcp"]
+  }
+}

@@ -6,7 +6,7 @@
  * that were previously uncovered due to external API dependencies.
  */
 
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 // ---------------------------------------------------------------------------
@@ -1037,5 +1037,605 @@ describe('ZeroDBClient', () => {
     // This should not throw even if credentials file does not exist
     client.loadCredentials();
     // apiKey remains null if no file
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Skills Client
+// ---------------------------------------------------------------------------
+
+describe('SkillsClient - construction and helpers', () => {
+  it('constructs with defaults', async () => {
+    const { SkillsClient } = await import('../src/skills/skills-client.js');
+    const client = new SkillsClient();
+
+    assert.equal(client.repo, process.env.SKILLS_REPO || 'the8genc/ai-8gent-skills');
+    assert.equal(client.branch, process.env.SKILLS_BRANCH || 'main');
+    assert.equal(client.zerodb, null);
+  });
+
+  it('constructs with config overrides', async () => {
+    const { SkillsClient } = await import('../src/skills/skills-client.js');
+    const client = new SkillsClient({
+      repo: 'org/skills',
+      branch: 'dev',
+      token: 'ghp_test',
+      ttlMs: 1000
+    });
+
+    assert.equal(client.repo, 'org/skills');
+    assert.equal(client.branch, 'dev');
+    assert.equal(client.token, 'ghp_test');
+    assert.equal(client.ttlMs, 1000);
+  });
+
+  it('_apiHeaders includes auth when token is set', async () => {
+    const { SkillsClient } = await import('../src/skills/skills-client.js');
+    const client = new SkillsClient({ token: 'ghp_test' });
+    const headers = client._apiHeaders();
+
+    assert.equal(headers.Authorization, 'Bearer ghp_test');
+    assert.equal(headers.Accept, 'application/vnd.github+json');
+  });
+
+  it('_apiHeaders has no auth when no token', async () => {
+    const { SkillsClient } = await import('../src/skills/skills-client.js');
+    const client = new SkillsClient({ token: null });
+    const headers = client._apiHeaders();
+
+    assert.equal(headers.Authorization, undefined);
+  });
+});
+
+describe('SkillsClient - parseFrontmatter', () => {
+  it('parses simple key-value frontmatter', async () => {
+    const { parseFrontmatter } = await import('../src/skills/skills-client.js');
+    const md = `---
+name: My Skill
+description: A test skill
+---
+# Body`;
+
+    const result = parseFrontmatter(md);
+    assert.equal(result.name, 'My Skill');
+    assert.equal(result.description, 'A test skill');
+  });
+
+  it('parses folded block scalar (>)', async () => {
+    const { parseFrontmatter } = await import('../src/skills/skills-client.js');
+    const md = `---
+name: Skill
+description: >
+  This is a long
+  folded description
+---
+# Body`;
+
+    const result = parseFrontmatter(md);
+    assert.equal(result.name, 'Skill');
+    assert.ok(result.description.includes('This is a long'));
+    assert.ok(result.description.includes('folded description'));
+  });
+
+  it('parses literal block scalar (|)', async () => {
+    const { parseFrontmatter } = await import('../src/skills/skills-client.js');
+    const md = `---
+name: Skill
+description: |
+  Line one
+  Line two
+---
+# Body`;
+
+    const result = parseFrontmatter(md);
+    assert.ok(result.description.includes('Line one'));
+  });
+
+  it('handles quoted values', async () => {
+    const { parseFrontmatter } = await import('../src/skills/skills-client.js');
+    const md = `---
+name: "Quoted Skill"
+description: 'Single quoted'
+---`;
+
+    const result = parseFrontmatter(md);
+    assert.equal(result.name, 'Quoted Skill');
+    assert.equal(result.description, 'Single quoted');
+  });
+
+  it('returns empty object when no frontmatter', async () => {
+    const { parseFrontmatter } = await import('../src/skills/skills-client.js');
+    const result = parseFrontmatter('# Just markdown\nNo frontmatter here');
+    assert.deepEqual(result, {});
+  });
+
+  it('handles >- and |- block scalars', async () => {
+    const { parseFrontmatter } = await import('../src/skills/skills-client.js');
+    const md = `---
+name: Test
+description: >-
+  Strip trailing
+  newlines
+---`;
+    const result = parseFrontmatter(md);
+    assert.ok(result.description.includes('Strip trailing'));
+  });
+
+  it('handles empty value after colon', async () => {
+    const { parseFrontmatter } = await import('../src/skills/skills-client.js');
+    const md = `---
+name: Test
+tags:
+---`;
+    const result = parseFrontmatter(md);
+    assert.equal(result.name, 'Test');
+    assert.equal(result.tags, '');
+  });
+});
+
+describe('SkillsClient - stripFrontmatter', () => {
+  it('strips frontmatter from markdown', async () => {
+    const { stripFrontmatter } = await import('../src/skills/skills-client.js');
+    const md = `---
+name: Test
+---
+# Body Content`;
+
+    const result = stripFrontmatter(md);
+    assert.ok(result.startsWith('# Body Content'));
+    assert.ok(!result.includes('---'));
+  });
+
+  it('returns full content when no frontmatter', async () => {
+    const { stripFrontmatter } = await import('../src/skills/skills-client.js');
+    const md = '# Just a doc';
+    const result = stripFrontmatter(md);
+    assert.equal(result, '# Just a doc');
+  });
+});
+
+describe('SkillsClient - syncToZeroDB', () => {
+  it('throws when zerodb is not authenticated', async () => {
+    const { SkillsClient } = await import('../src/skills/skills-client.js');
+    const client = new SkillsClient({ zerodb: { isAuthenticated: false } });
+
+    await assert.rejects(
+      () => client.syncToZeroDB(),
+      /credentials/i
+    );
+  });
+
+  it('throws when zerodb is null', async () => {
+    const { SkillsClient } = await import('../src/skills/skills-client.js');
+    const client = new SkillsClient({ zerodb: null });
+
+    await assert.rejects(
+      () => client.syncToZeroDB(),
+      /credentials/i
+    );
+  });
+});
+
+describe('SkillsClient - searchSkills with ZeroDB hits', () => {
+  it('returns zerodb results when available', async () => {
+    const { SkillsClient } = await import('../src/skills/skills-client.js');
+    const mockZerodb = {
+      isAuthenticated: true,
+      searchMemory: async () => ({
+        results: [{
+          metadata: {
+            type: 'skill',
+            skill_slug: 'test-skill',
+            skill_name: 'Test Skill',
+            description: 'A test skill',
+            references: ['ref.md']
+          },
+          similarity: 0.9
+        }]
+      })
+    };
+
+    const client = new SkillsClient({ zerodb: mockZerodb });
+    const result = await client.searchSkills('test');
+
+    assert.equal(result.source, 'zerodb');
+    assert.equal(result.results.length, 1);
+    assert.equal(result.results[0].slug, 'test-skill');
+  });
+
+  it('falls back to GitHub keyword match when ZeroDB search fails', async () => {
+    const { SkillsClient } = await import('../src/skills/skills-client.js');
+    const mockZerodb = {
+      isAuthenticated: true,
+      searchMemory: async () => { throw new Error('ZeroDB down'); }
+    };
+
+    // We need to also mock _tree and getRaw for the GitHub fallback
+    const client = new SkillsClient({ zerodb: mockZerodb });
+    // Pre-fill the cache to avoid real GitHub call
+    client._listCache = {
+      at: Date.now(),
+      skills: [
+        { name: 'Test Skill', slug: 'test-skill', description: 'testing skills', path: 'skills/test-skill/SKILL.md', references: [] },
+        { name: 'Other', slug: 'other', description: 'something else', path: 'skills/other/SKILL.md', references: [] }
+      ]
+    };
+
+    const result = await client.searchSkills('test skill');
+    assert.equal(result.source, 'github');
+    assert.ok(result.results.length >= 1);
+    assert.equal(result.results[0].slug, 'test-skill');
+  });
+
+  it('falls back to GitHub when ZeroDB returns no skill-type results', async () => {
+    const { SkillsClient } = await import('../src/skills/skills-client.js');
+    const mockZerodb = {
+      isAuthenticated: true,
+      searchMemory: async () => ({
+        results: [{ metadata: { type: 'prd-reference' }, content: 'not a skill' }]
+      })
+    };
+
+    const client = new SkillsClient({ zerodb: mockZerodb });
+    client._listCache = {
+      at: Date.now(),
+      skills: [
+        { name: 'Memory Skill', slug: 'memory', description: 'memory management', path: 'skills/memory/SKILL.md', references: [] }
+      ]
+    };
+
+    const result = await client.searchSkills('memory');
+    assert.equal(result.source, 'github');
+  });
+
+  it('falls back to GitHub when zerodb is not authenticated', async () => {
+    const { SkillsClient } = await import('../src/skills/skills-client.js');
+    const client = new SkillsClient({ zerodb: { isAuthenticated: false } });
+    client._listCache = {
+      at: Date.now(),
+      skills: [
+        { name: 'Build', slug: 'build', description: 'build tool', path: 'skills/build/SKILL.md', references: [] }
+      ]
+    };
+
+    const result = await client.searchSkills('build');
+    assert.equal(result.source, 'github');
+  });
+});
+
+describe('SkillsClient - listSkills cache', () => {
+  it('returns cached results when within TTL', async () => {
+    const { SkillsClient } = await import('../src/skills/skills-client.js');
+    const client = new SkillsClient({ ttlMs: 60000 });
+
+    const cachedSkills = [
+      { name: 'Cached', slug: 'cached', description: 'cached skill', path: 'skills/cached/SKILL.md', references: [] }
+    ];
+    client._listCache = { at: Date.now(), skills: cachedSkills };
+
+    const result = await client.listSkills();
+    assert.equal(result.length, 1);
+    assert.equal(result[0].slug, 'cached');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Skill Tools (executeSkillTool)
+// ---------------------------------------------------------------------------
+
+describe('Skill Tools - executeSkillTool', () => {
+  // Helper to create a mock skills client
+  function createMockSkillsClient(overrides = {}) {
+    return {
+      repo: 'test/repo',
+      branch: 'main',
+      zerodb: { isAuthenticated: false },
+      listSkills: async () => [
+        { name: 'Test Skill', slug: 'test-skill', description: 'A test', path: 'skills/test-skill/SKILL.md', references: ['ref.md'] }
+      ],
+      getSkill: async () => ({
+        name: 'Test Skill',
+        slug: 'test-skill',
+        description: 'A test',
+        path: 'skills/test-skill/SKILL.md',
+        body: '# Test Skill\nBody content',
+        content: '---\nname: Test Skill\n---\n# Test Skill\nBody content',
+        references: ['ref.md'],
+        source: 'https://github.com/test/repo/blob/main/skills/test-skill/SKILL.md'
+      }),
+      getReference: async () => '# Reference content',
+      searchSkills: async () => ({
+        source: 'github',
+        results: [{ slug: 'test-skill', name: 'Test Skill', description: 'A test', score: 1 }]
+      }),
+      syncToZeroDB: async () => ({ synced: ['test-skill'], count: 1, repo: 'test/repo', branch: 'main' }),
+      ...overrides
+    };
+  }
+
+  it('returns error when skills client is not initialized', async () => {
+    const { executeSkillTool } = await import('../src/tools/skill-tools.js');
+    const result = await executeSkillTool('skill_list', {}, {});
+    assert.ok(result.error);
+    assert.ok(result.error.includes('not initialized'));
+  });
+
+  it('returns error when context is null', async () => {
+    const { executeSkillTool } = await import('../src/tools/skill-tools.js');
+    const result = await executeSkillTool('skill_list', {}, null);
+    assert.ok(result.error);
+  });
+
+  it('skill_list returns skills from mock client', async () => {
+    const { executeSkillTool } = await import('../src/tools/skill-tools.js');
+    const skills = createMockSkillsClient();
+    const result = await executeSkillTool('skill_list', {}, { skills });
+
+    assert.equal(result.count, 1);
+    assert.equal(result.skills[0].slug, 'test-skill');
+    assert.equal(result.repo, 'test/repo');
+    assert.ok(result.message.includes('1 skill(s)'));
+  });
+
+  it('skill_list with refresh flag', async () => {
+    const { executeSkillTool } = await import('../src/tools/skill-tools.js');
+    let refreshCalled = false;
+    const skills = createMockSkillsClient({
+      listSkills: async ({ refresh }) => {
+        refreshCalled = refresh;
+        return [];
+      }
+    });
+
+    const result = await executeSkillTool('skill_list', { refresh: true }, { skills });
+    assert.equal(refreshCalled, true);
+    assert.equal(result.count, 0);
+    assert.ok(result.message.includes('No skills found'));
+  });
+
+  it('skill_get returns skill content', async () => {
+    const { executeSkillTool } = await import('../src/tools/skill-tools.js');
+    const skills = createMockSkillsClient();
+    const result = await executeSkillTool('skill_get', { skill: 'test-skill' }, { skills });
+
+    assert.equal(result.slug, 'test-skill');
+    assert.ok(result.body);
+  });
+
+  it('skill_get with references', async () => {
+    const { executeSkillTool } = await import('../src/tools/skill-tools.js');
+    const skills = createMockSkillsClient({
+      getSkill: async (id, { withReferences }) => ({
+        name: 'Test',
+        slug: 'test',
+        body: 'body',
+        references: ['ref.md'],
+        reference_contents: withReferences ? { 'ref.md': '# Ref' } : undefined
+      })
+    });
+
+    const result = await executeSkillTool('skill_get', { skill: 'test', with_references: true }, { skills });
+    assert.ok(result.reference_contents);
+  });
+
+  it('skill_get_reference returns reference content', async () => {
+    const { executeSkillTool } = await import('../src/tools/skill-tools.js');
+    const skills = createMockSkillsClient();
+    const result = await executeSkillTool('skill_get_reference', { skill: 'test-skill', reference: 'ref.md' }, { skills });
+
+    assert.equal(result.skill, 'test-skill');
+    assert.equal(result.reference, 'ref.md');
+    assert.equal(result.content, '# Reference content');
+  });
+
+  it('skill_search returns search results', async () => {
+    const { executeSkillTool } = await import('../src/tools/skill-tools.js');
+    const skills = createMockSkillsClient();
+    const result = await executeSkillTool('skill_search', { query: 'testing' }, { skills });
+
+    assert.equal(result.query, 'testing');
+    assert.equal(result.source, 'github');
+    assert.ok(result.count >= 1);
+  });
+
+  it('skill_search includes hint when zerodb has no mirror', async () => {
+    const { executeSkillTool } = await import('../src/tools/skill-tools.js');
+    const skills = createMockSkillsClient();
+    skills.zerodb = { isAuthenticated: true };
+    const result = await executeSkillTool('skill_search', { query: 'test' }, { skills });
+
+    assert.ok(result.message.includes('skill_sync'));
+  });
+
+  it('skill_sync syncs skills', async () => {
+    const { executeSkillTool } = await import('../src/tools/skill-tools.js');
+    const skills = createMockSkillsClient();
+    const result = await executeSkillTool('skill_sync', {}, { skills });
+
+    assert.equal(result.count, 1);
+    assert.ok(result.message.includes('Synced 1'));
+  });
+
+  it('skill_sync with specific slug', async () => {
+    const { executeSkillTool } = await import('../src/tools/skill-tools.js');
+    const skills = createMockSkillsClient();
+    const result = await executeSkillTool('skill_sync', { skill: 'test-skill' }, { skills });
+
+    assert.equal(result.count, 1);
+  });
+
+  it('returns null for unknown tool name', async () => {
+    const { executeSkillTool } = await import('../src/tools/skill-tools.js');
+    const skills = createMockSkillsClient();
+    const result = await executeSkillTool('unknown_tool', {}, { skills });
+    assert.equal(result, null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Server (createMcpServer)
+// ---------------------------------------------------------------------------
+
+describe('Server - createMcpServer', () => {
+  let handlers;
+  const mockSkills = {
+    repo: 'test/repo',
+    branch: 'main',
+    zerodb: { isAuthenticated: false },
+    listSkills: async () => [
+      { name: 'Test Skill', slug: 'test-skill', description: 'desc', path: 'skills/test-skill/SKILL.md', references: ['ref.md'] }
+    ],
+    getSkill: async () => ({
+      name: 'Test Skill',
+      slug: 'test-skill',
+      description: 'desc',
+      body: '# Body',
+      content: '---\nname: Test\n---\n# Body',
+      references: ['ref.md'],
+      source: 'https://github.com/test/repo'
+    }),
+    getReference: async () => '# Ref',
+    searchSkills: async () => ({ source: 'github', results: [{ slug: 'test-skill', name: 'Test', score: 1 }] }),
+    syncToZeroDB: async () => ({ synced: ['test-skill'], count: 1, repo: 'test/repo', branch: 'main' })
+  };
+
+  before(async () => {
+    const { createMcpServer } = await import('../src/server.js');
+    const server = createMcpServer({
+      client: createMockClient(),
+      skills: mockSkills,
+      serverName: 'test-server',
+      version: '0.0.1'
+    });
+    handlers = server._requestHandlers;
+  });
+
+  it('creates server with all tools registered', async () => {
+    const { ALL_TOOLS } = await import('../src/server.js');
+    assert.ok(ALL_TOOLS.length >= 23);
+    assert.ok(handlers.has('tools/list'));
+    assert.ok(handlers.has('tools/call'));
+    assert.ok(handlers.has('prompts/list'));
+    assert.ok(handlers.has('prompts/get'));
+  });
+
+  it('tools/list returns all tool definitions', async () => {
+    const handler = handlers.get('tools/list');
+    const result = await handler({ method: 'tools/list' });
+    assert.ok(result.tools.length >= 23);
+    assert.ok(result.tools.every(t => t.name && t.description && t.inputSchema));
+  });
+
+  it('tools/call executes a PRD tool (prd_list_services)', async () => {
+    const handler = handlers.get('tools/call');
+    const result = await handler({ method: 'tools/call', params: { name: 'prd_list_services', arguments: {} } });
+    assert.ok(!result.isError);
+    const parsed = JSON.parse(result.content[0].text);
+    assert.ok(parsed.count >= 15);
+  });
+
+  it('tools/call executes a skill tool (skill_list)', async () => {
+    const handler = handlers.get('tools/call');
+    const result = await handler({ method: 'tools/call', params: { name: 'skill_list', arguments: {} } });
+    assert.ok(!result.isError);
+    const parsed = JSON.parse(result.content[0].text);
+    assert.equal(parsed.count, 1);
+  });
+
+  it('tools/call returns error for unknown tool', async () => {
+    const handler = handlers.get('tools/call');
+    const result = await handler({ method: 'tools/call', params: { name: 'nonexistent_tool', arguments: {} } });
+    assert.equal(result.isError, true);
+    const parsed = JSON.parse(result.content[0].text);
+    assert.ok(parsed.error.includes('Unknown tool'));
+  });
+
+  it('tools/call handles tool that returns null', async () => {
+    // generation tools returns null for unknown names within the executor
+    const handler = handlers.get('tools/call');
+    // prd_validate with no content/prd_id should throw
+    const result = await handler({ method: 'tools/call', params: { name: 'prd_validate', arguments: {} } });
+    // This should be an error since resolveContent throws
+    assert.equal(result.isError, true);
+  });
+
+  it('prompts/list returns skill-based prompts', async () => {
+    const handler = handlers.get('prompts/list');
+    const result = await handler({ method: 'prompts/list' });
+    assert.equal(result.prompts.length, 1);
+    assert.equal(result.prompts[0].name, 'test-skill');
+    assert.ok(result.prompts[0].arguments.length === 1);
+  });
+
+  it('prompts/list handles skills fetch failure gracefully', async () => {
+    const { createMcpServer } = await import('../src/server.js');
+    const failServer = createMcpServer({
+      client: createMockClient(),
+      skills: { ...mockSkills, listSkills: async () => { throw new Error('rate limited'); } },
+      serverName: 'fail-test',
+      version: '0.0.1'
+    });
+    const handler = failServer._requestHandlers.get('prompts/list');
+    const result = await handler({ method: 'prompts/list' });
+    assert.deepEqual(result.prompts, []);
+  });
+
+  it('prompts/get returns skill body as prompt', async () => {
+    const handler = handlers.get('prompts/get');
+    const result = await handler({ method: 'prompts/get', params: { name: 'test-skill', arguments: {} } });
+    assert.ok(result.messages[0].content.text.includes('# Body'));
+  });
+
+  it('prompts/get appends task input', async () => {
+    const handler = handlers.get('prompts/get');
+    const result = await handler({ method: 'prompts/get', params: { name: 'test-skill', arguments: { input: 'Do task X' } } });
+    assert.ok(result.messages[0].content.text.includes('Do task X'));
+    assert.ok(result.messages[0].content.text.includes('## Task'));
+  });
+
+  it('prompts/get includes reference file hints', async () => {
+    const handler = handlers.get('prompts/get');
+    const result = await handler({ method: 'prompts/get', params: { name: 'test-skill', arguments: {} } });
+    assert.ok(result.messages[0].content.text.includes('ref.md'));
+    assert.ok(result.messages[0].content.text.includes('skill_get_reference'));
+  });
+
+  it('tools/call error result includes hint for credentials errors', async () => {
+    const { createMcpServer } = await import('../src/server.js');
+    const errorServer = createMcpServer({
+      client: createMockClient(),
+      skills: {
+        ...mockSkills,
+        getSkill: async () => { throw new Error('credentials missing'); }
+      },
+      serverName: 'hint-test',
+      version: '0.0.1'
+    });
+    const handler = errorServer._requestHandlers.get('tools/call');
+    const result = await handler({ method: 'tools/call', params: { name: 'skill_get', arguments: { skill: 'x' } } });
+    assert.equal(result.isError, true);
+    const parsed = JSON.parse(result.content[0].text);
+    assert.ok(parsed.hint);
+    assert.ok(parsed.hint.includes('ZERODB_API_KEY'));
+  });
+
+  it('prompts/get for skill with no references omits hint', async () => {
+    const { createMcpServer } = await import('../src/server.js');
+    const noRefServer = createMcpServer({
+      client: createMockClient(),
+      skills: {
+        ...mockSkills,
+        getSkill: async () => ({
+          name: 'No Ref', slug: 'no-ref', description: 'no refs',
+          body: '# Body', content: '# Body', references: [],
+          source: 'https://github.com/test/repo'
+        })
+      },
+      serverName: 'no-ref-test',
+      version: '0.0.1'
+    });
+    const handler = noRefServer._requestHandlers.get('prompts/get');
+    const result = await handler({ method: 'prompts/get', params: { name: 'no-ref', arguments: {} } });
+    assert.ok(!result.messages[0].content.text.includes('skill_get_reference'));
   });
 });

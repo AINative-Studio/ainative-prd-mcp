@@ -246,7 +246,6 @@ export async function executeGenerationTool(toolName, args, client) {
 
 async function handleGenerate(args, client) {
   const systemPrompt = buildSystemPrompt(args.template || 'standard');
-  const userPrompt = buildUserPrompt(args);
 
   // Auto-detect AINative services if not specified
   let suggestedServices = args.ainative_services;
@@ -257,7 +256,39 @@ async function handleGenerate(args, client) {
   let prdContent;
 
   if (client.isAuthenticated) {
-    // AI-powered generation
+    // AI-powered generation: fill template with user vars first, then let AI complete
+    const partialTemplate = renderTemplate(args.template || 'standard', args);
+
+    // Extract remaining unfilled placeholders
+    const remaining = [...new Set((partialTemplate.match(/\{\{[A-Z_]+\}\}/g) || []))];
+
+    let userPrompt;
+    if (remaining.length > 0) {
+      // Template-aware prompt: AI fills the remaining placeholders
+      userPrompt = `You are given a PRD template with some sections already filled and some marked with {{PLACEHOLDER}} tokens.
+
+Your task: Replace every {{PLACEHOLDER}} with detailed, production-ready content based on the product context below.
+
+Product: ${args.product_name}
+Description: ${args.description}
+Target Audience: ${args.target_audience}
+Core Features:
+${(args.core_features || []).map(f => `- ${f}`).join('\n')}
+Constraints:
+${(args.constraints || []).map(c => `- ${c}`).join('\n') || '- None'}
+${args.additional_context ? `Additional Context:\n${args.additional_context}` : ''}
+
+Placeholders to fill: ${remaining.join(', ')}
+
+IMPORTANT: Return the COMPLETE document with all placeholders replaced. Keep the existing filled sections exactly as they are. Do NOT add \`\`\`markdown fences — return raw markdown only.
+
+--- TEMPLATE START ---
+${partialTemplate}
+--- TEMPLATE END ---`;
+    } else {
+      userPrompt = buildUserPrompt(args);
+    }
+
     try {
       const response = await client.chatCompletion([
         { role: 'system', content: systemPrompt },
@@ -265,9 +296,14 @@ async function handleGenerate(args, client) {
       ], { max_tokens: 8000, temperature: 0.7 });
 
       prdContent = response.choices?.[0]?.message?.content || response.content;
+
+      // Strip markdown fences if AI wrapped it
+      if (prdContent) {
+        prdContent = prdContent.replace(/^```(?:markdown)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+      }
     } catch (err) {
-      // Fallback to template
-      prdContent = renderTemplate(args.template || 'standard', args);
+      // Fallback to template with user vars only
+      prdContent = partialTemplate;
     }
   } else {
     // Template-only mode (no API access)
